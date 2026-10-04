@@ -117,7 +117,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '1-я планета · каменистая',
+                  '1-я планета · +167°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
@@ -206,7 +206,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '2-я планета · горячая',
+                  '2-я планета · +464°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
@@ -295,7 +295,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '3-я планета · обитаемая',
+                  '3-я планета · +15°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
@@ -384,7 +384,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '4-я планета · красная',
+                  '4-я планета · −63°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
@@ -473,7 +473,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '5-я планета · газовый гигант',
+                  '5-я планета · −108°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
@@ -562,7 +562,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '6-я планета · с кольцами',
+                  '6-я планета · −139°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
@@ -651,7 +651,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '7-я планета · ледяной гигант',
+                  '7-я планета · −195°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
@@ -740,7 +740,7 @@ class MainApp extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '8-я планета · ледяной гигант',
+                  '8-я планета · −201°C',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14),
