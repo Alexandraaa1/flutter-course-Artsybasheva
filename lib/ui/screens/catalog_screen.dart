@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter_application_1/domain/entities/planet.dart';
 import 'package:flutter_application_1/ui/widgets/planet_card.dart';
+
+const String baseUrl = 'https://6ad5f6a8f71f154ac486407e.mockapi.io';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -10,75 +14,97 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
-  static const List<Planet> planets = [
-    Planet(
-      id: 1,
-      name: 'Меркурий',
-      subtitle: '1-я планета · +167°C',
-      category: Category.planet,
-      letter: 'Ме',
-      color: Color(0xFF6E6E6E),
-    ),
-    Planet(
-      id: 2,
-      name: 'Венера',
-      subtitle: '2-я планета · +464°C',
-      category: Category.planet,
-      letter: 'В',
-      color: Color(0xFFE8A33D),
-    ),
-    Planet(
-      id: 3,
-      name: 'Земля',
-      subtitle: '3-я планета · +15°C',
-      category: Category.planet,
-      letter: 'З',
-      color: Color(0xFF1E88E5),
-    ),
-    Planet(
-      id: 4,
-      name: 'Марс',
-      subtitle: '4-я планета · −63°C',
-      category: Category.planet,
-      letter: 'Ма',
-      color: Color(0xFFC1440E),
-    ),
-    Planet(
-      id: 5,
-      name: 'Юпитер',
-      subtitle: '5-я планета · −108°C',
-      category: Category.gasGiant,
-      letter: 'Ю',
-      color: Color(0xFFB07D4C),
-    ),
-    Planet(
-      id: 6,
-      name: 'Сатурн',
-      subtitle: '6-я планета · −139°C',
-      category: Category.gasGiant,
-      letter: 'С',
-      color: Color(0xFFD4A857),
-    ),
-    Planet(
-      id: 7,
-      name: 'Уран',
-      subtitle: '7-я планета · −195°C',
-      category: Category.iceGiant,
-      letter: 'У',
-      color: Color(0xFF7FCDD6),
-    ),
-    Planet(
-      id: 8,
-      name: 'Нептун',
-      subtitle: '8-я планета · −201°C',
-      category: Category.iceGiant,
-      letter: 'Н',
-      color: Color(0xFF3559B5),
-    ),
-  ];
+  List<Planet> _planets = [];
+  bool _isLoading = false;
+  String? _error;
 
   Set<int> _likedIds = {};
   bool _showOnlyLiked = false;
+
+  final TextEditingController _nameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    loadPlanets();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> loadPlanets() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/planets'));
+      
+      if (response.statusCode != 200) {
+        throw Exception('Статус ${response.statusCode}');
+      }
+
+      final list = jsonDecode(response.body) as List;
+      
+      setState(() {
+        _planets = list.map((e) => Planet.fromJson(e)).toList();
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> addPlanet() async {
+    final newName = _nameController.text.trim();
+    
+    if (newName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Введите название планеты')),
+      );
+      return; 
+    }
+
+    final newPlanet = Planet(
+      name: newName,
+      subtitle: 'Добавлено пользователем',
+      category: Category.planet,
+      letter: newName[0].toUpperCase(),
+      color: Colors.grey, 
+    );
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/planets'),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode(newPlanet.toJson()), 
+      );
+
+      if (response.statusCode != 201) {
+        throw Exception('Статус ${response.statusCode}');
+      }
+
+      final created = Planet.fromJson(jsonDecode(response.body));
+
+      setState(() {
+        _planets.insert(0, created);
+        _nameController.clear();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка отправки: $e')),
+      );
+    }
+  }
 
   void _toggleLike(int id) {
     setState(() {
@@ -93,8 +119,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     final visiblePlanets = _showOnlyLiked
-        ? planets.where((p) => _likedIds.contains(p.id)).toList()
-        : planets;
+        ? _planets.where((p) => p.id != null && _likedIds.contains(p.id)).toList()
+        : _planets;
 
     return Scaffold(
       backgroundColor: const Color(0xFFE8EEF7),
@@ -120,38 +146,84 @@ class _CatalogScreenState extends State<CatalogScreen> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _showOnlyLiked = !_showOnlyLiked;
-                    });
-                  },
-                  child: Text(
-                    _showOnlyLiked ? '✓ Только избранные' : 'Только избранные',
+                Expanded(
+                  child: TextField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Название планеты',
+                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: addPlanet,
+                  child: const Icon(Icons.send),
                 ),
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextButton(
+              onPressed: () {
+                setState(() {
+                  _showOnlyLiked = !_showOnlyLiked;
+                });
+              },
+              child: Text(
+                _showOnlyLiked ? '✓ Только избранные' : 'Только избранные',
+              ),
+            ),
+          ),
           Expanded(
-            child: visiblePlanets.isEmpty
-                ? const Center(child: Text('Ничего не нашлось'))
-                : ListView.builder(
-                    itemCount: visiblePlanets.length,
-                    itemBuilder: (context, index) {
-                      final planet = visiblePlanets[index];
-                      return PlanetCard(
-                        planet: planet,
-                        isLiked: _likedIds.contains(planet.id),
-                        onLikeTap: () => _toggleLike(planet.id),
-                      );
-                    },
-                  ),
+            child: _buildBody(visiblePlanets),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBody(List<Planet> visiblePlanets) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Ошибка: $_error', style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: loadPlanets,
+              child: const Text('Обновить'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (visiblePlanets.isEmpty) {
+      return const Center(child: Text('Ничего не нашлось'));
+    }
+
+    return ListView.builder(
+      itemCount: visiblePlanets.length,
+      itemBuilder: (context, index) {
+        final planet = visiblePlanets[index];
+        return PlanetCard(
+          planet: planet,
+          isLiked: planet.id != null && _likedIds.contains(planet.id),
+          onLikeTap: () {
+            if (planet.id != null) _toggleLike(planet.id!);
+          },
+        );
+      },
     );
   }
 }
