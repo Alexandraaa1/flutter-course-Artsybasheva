@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "972484861632",
+    "project_id": "catalog-artsybasheva",
+    "storage_bucket": "catalog-artsybasheva.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:972484861632:android:97d80043e21e5ef58b9725",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAn2ckTJN9aoyDXAwdO6KwOgN4Kv-b5Ib8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
