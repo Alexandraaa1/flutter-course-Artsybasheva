@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum Category { planet, gasGiant, iceGiant }
 
 class Planet {
-  final int? id;
+  final String? id;
   final String name;
   final String subtitle;
   final Category category;
@@ -23,7 +24,7 @@ class Planet {
 
   factory Planet.fromJson(Map<String, dynamic> json) {
     return Planet(
-      id: json['id'] != null ? int.tryParse(json['id'].toString()) : null,
+      id: json['id']?.toString(),
       name: json['name'] ?? 'Без названия',
       subtitle: json['subtitle'] ?? '',
       category: Category.values.firstWhere(
@@ -36,13 +37,29 @@ class Planet {
     );
   }
 
+  factory Planet.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data()!;
+    return Planet(
+      id: doc.id,
+      name: data['name'] ?? 'Без названия',
+      subtitle: data['subtitle'] ?? '',
+      category: Category.values.firstWhere(
+        (e) => e.name == data['category'],
+        orElse: () => Category.planet,
+      ),
+      letter: data['letter'] ?? '?',
+      color: Color(int.parse('FF${data['color'] ?? '000000'}', radix: 16)),
+      description: data['description'],
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'name': name,
       'subtitle': subtitle,
       'category': category.name,
       'letter': letter,
-      'color': color.value.toRadixString(16).substring(2).toUpperCase(),
+      'color': color.toARGB32().toRadixString(16).substring(2).toUpperCase(), 
       'description': description ?? '',
     };
   }

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/domain/entities/planet.dart';
 import 'package:flutter_application_1/ui/widgets/planet_card.dart';
-
-const String baseUrl = 'https://6ad5f6a8f71f154ac486407e.mockapi.io';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -14,20 +12,13 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
-  List<Planet> _planets = [];
-  bool _isLoading = false;
-  String? _error;
+  final _planetsStream = FirebaseFirestore.instance
+      .collection('planets')
+      .snapshots();
 
-  Set<int> _likedIds = {};
+  Set<String> _likedIds = {};
   bool _showOnlyLiked = false;
-
   final TextEditingController _nameController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    loadPlanets();
-  }
 
   @override
   void dispose() {
@@ -35,78 +26,30 @@ class _CatalogScreenState extends State<CatalogScreen> {
     super.dispose();
   }
 
-  Future<void> loadPlanets() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/planets'));
-      
-      if (response.statusCode != 200) {
-        throw Exception('Статус ${response.statusCode}');
-      }
-
-      final list = jsonDecode(response.body) as List;
-      
-      setState(() {
-        _planets = list.map((e) => Planet.fromJson(e)).toList();
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
   Future<void> addPlanet() async {
     final newName = _nameController.text.trim();
-    
-    if (newName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите название планеты')),
-      );
-      return; 
-    }
+    if (newName.isEmpty) return;
 
     final newPlanet = Planet(
       name: newName,
       subtitle: 'Добавлено пользователем',
       category: Category.planet,
       letter: newName[0].toUpperCase(),
-      color: Colors.grey, 
+      color: Colors.grey,
     );
 
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/planets'),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode(newPlanet.toJson()), 
-      );
-
-      if (response.statusCode != 201) {
-        throw Exception('Статус ${response.statusCode}');
-      }
-
-      final created = Planet.fromJson(jsonDecode(response.body));
-
-      setState(() {
-        _planets.insert(0, created);
-        _nameController.clear();
-      });
+      await FirebaseFirestore.instance
+          .collection('planets')
+          .add(newPlanet.toJson());
+      _nameController.clear();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка отправки: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     }
   }
 
-  void _toggleLike(int id) {
+  void _toggleLike(String id) {
     setState(() {
       if (_likedIds.contains(id)) {
         _likedIds.remove(id);
@@ -118,10 +61,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final visiblePlanets = _showOnlyLiked
-        ? _planets.where((p) => p.id != null && _likedIds.contains(p.id)).toList()
-        : _planets;
-
     return Scaffold(
       backgroundColor: const Color(0xFFE8EEF7),
       appBar: AppBar(
@@ -140,6 +79,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -166,6 +113,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ],
             ),
           ),
+
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: TextButton(
@@ -179,51 +127,60 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
           ),
+
           Expanded(
-            child: _buildBody(visiblePlanets),
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _planetsStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(child: Text('Ошибка: ${snapshot.error}'));
+                }
+
+                final docs = snapshot.data!.docs;
+
+                final planets = docs
+                    .map(
+                      (doc) => Planet.fromFirestore(
+                        doc as DocumentSnapshot<Map<String, dynamic>>,
+                      ),
+                    )
+                    .toList();
+
+                final visiblePlanets = _showOnlyLiked
+                    ? planets
+                          .where(
+                            (p) => p.id != null && _likedIds.contains(p.id),
+                          )
+                          .toList()
+                    : planets;
+
+                if (visiblePlanets.isEmpty) {
+                  return const Center(child: Text('Ничего не нашлось'));
+                }
+
+                return ListView.builder(
+                  itemCount: visiblePlanets.length,
+                  itemBuilder: (context, index) {
+                    final planet = visiblePlanets[index];
+                    return PlanetCard(
+                      planet: planet,
+                      isLiked:
+                          planet.id != null && _likedIds.contains(planet.id),
+                      onLikeTap: () {
+                        if (planet.id != null) _toggleLike(planet.id!);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBody(List<Planet> visiblePlanets) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Ошибка: $_error', style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: loadPlanets,
-              child: const Text('Обновить'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (visiblePlanets.isEmpty) {
-      return const Center(child: Text('Ничего не нашлось'));
-    }
-
-    return ListView.builder(
-      itemCount: visiblePlanets.length,
-      itemBuilder: (context, index) {
-        final planet = visiblePlanets[index];
-        return PlanetCard(
-          planet: planet,
-          isLiked: planet.id != null && _likedIds.contains(planet.id),
-          onLikeTap: () {
-            if (planet.id != null) _toggleLike(planet.id!);
-          },
-        );
-      },
     );
   }
 }
