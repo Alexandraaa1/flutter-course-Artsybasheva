@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/domain/entities/planet.dart';
 import 'package:flutter_application_1/ui/widgets/planet_card.dart';
+import 'package:flutter_application_1/bloc/planet_bloc.dart';
+import 'package:flutter_application_1/bloc/planet_event.dart';
+import 'package:flutter_application_1/bloc/planet_state.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -12,9 +16,6 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
-  final _planetsStream = FirebaseFirestore.instance
-      .collection('planets')
-      .snapshots();
 
   Set<String> _likedIds = {};
   bool _showOnlyLiked = false;
@@ -39,6 +40,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     );
 
     try {
+  
       await FirebaseFirestore.instance
           .collection('planets')
           .add(newPlanet.toJson());
@@ -127,35 +129,43 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
           ),
-
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _planetsStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+            child: BlocBuilder<PlanetBloc, PlanetState>(
+              builder: (context, state) {
+             
+                if (state is PlanetLoadInProgress) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                if (snapshot.hasError) {
-                  return Center(child: Text('Ошибка: ${snapshot.error}'));
+        
+                if (state is PlanetLoadFailure) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(state.message,
+                            style: const TextStyle(color: Colors.red)),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                        
+                          onPressed: () {
+                            context
+                                .read<PlanetBloc>()
+                                .add(PlanetLoadRequested());
+                          },
+                          child: const Text('Обновить'),
+                        ),
+                      ],
+                    ),
+                  );
                 }
 
-                final docs = snapshot.data!.docs;
-
-                final planets = docs
-                    .map(
-                      (doc) => Planet.fromFirestore(
-                        doc as DocumentSnapshot<Map<String, dynamic>>,
-                      ),
-                    )
-                    .toList();
+                final planets = (state as PlanetLoadSuccess).planets;
 
                 final visiblePlanets = _showOnlyLiked
                     ? planets
-                          .where(
-                            (p) => p.id != null && _likedIds.contains(p.id),
-                          )
-                          .toList()
+                        .where((p) => p.id != null && _likedIds.contains(p.id))
+                        .toList()
                     : planets;
 
                 if (visiblePlanets.isEmpty) {
