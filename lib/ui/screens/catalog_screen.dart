@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/domain/entities/planet.dart';
 import 'package:flutter_application_1/ui/widgets/planet_card.dart';
+import 'package:flutter_application_1/ui/screens/planet_details_screen.dart';
 import 'package:flutter_application_1/bloc/planet_bloc.dart';
 import 'package:flutter_application_1/bloc/planet_event.dart';
 import 'package:flutter_application_1/bloc/planet_state.dart';
@@ -16,71 +16,13 @@ class CatalogScreen extends StatefulWidget {
 }
 
 class _CatalogScreenState extends State<CatalogScreen> {
-
-  Set<String> _likedIds = {};
-  bool _showOnlyLiked = false;
-  final TextEditingController _nameController = TextEditingController();
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> addPlanet() async {
-    final newName = _nameController.text.trim();
-    if (newName.isEmpty) return;
-
-    final newPlanet = Planet(
-      name: newName,
-      subtitle: 'Добавлено пользователем',
-      category: Category.planet,
-      letter: newName[0].toUpperCase(),
-      color: Colors.grey,
-    );
-
-    try {
-  
-      await FirebaseFirestore.instance
-          .collection('planets')
-          .add(newPlanet.toJson());
-      _nameController.clear();
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
-    }
-  }
-
-  void _toggleLike(String id) {
-    setState(() {
-      if (_likedIds.contains(id)) {
-        _likedIds.remove(id);
-      } else {
-        _likedIds.add(id);
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFE8EEF7),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Каталог планет',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(
-              'В избранном: ${_likedIds.length}',
-              style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
-            ),
-          ],
-        ),
+        title: const Text('Каталог планет', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.black),
@@ -90,107 +32,132 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Название планеты',
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
+      body: BlocBuilder<PlanetBloc, PlanetState>(
+        builder: (context, state) {
+          if (state is PlanetLoadInProgress) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state is PlanetLoadFailure) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(state.message, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => context.read<PlanetBloc>().add(PlanetLoadRequested()),
+                    child: const Text('Обновить'),
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: addPlanet,
-                  child: const Icon(Icons.send),
-                ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: TextButton(
-              onPressed: () {
-                setState(() {
-                  _showOnlyLiked = !_showOnlyLiked;
-                });
-              },
-              child: Text(
-                _showOnlyLiked ? '✓ Только избранные' : 'Только избранные',
+                ],
               ),
-            ),
-          ),
-          Expanded(
-            child: BlocBuilder<PlanetBloc, PlanetState>(
-              builder: (context, state) {
-             
-                if (state is PlanetLoadInProgress) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            );
+          }
 
-        
-                if (state is PlanetLoadFailure) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(state.message,
-                            style: const TextStyle(color: Colors.red)),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                        
-                          onPressed: () {
-                            context
-                                .read<PlanetBloc>()
-                                .add(PlanetLoadRequested());
-                          },
-                          child: const Text('Обновить'),
-                        ),
-                      ],
+          final loadedState = state as PlanetLoadSuccess;
+          final visiblePlanets = loadedState.visiblePlanets;
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('В избранном: ${loadedState.likedIds.length}', style: const TextStyle(fontSize: 16, color: Colors.blueGrey)),
+                    TextButton(
+                      onPressed: () => context.read<PlanetBloc>().add(PlanetFilterToggled()),
+                      child: Text(loadedState.showOnlyLiked ? '✓ Только избранные' : 'Только избранные'),
                     ),
-                  );
-                }
-
-                final planets = (state as PlanetLoadSuccess).planets;
-
-                final visiblePlanets = _showOnlyLiked
-                    ? planets
-                        .where((p) => p.id != null && _likedIds.contains(p.id))
-                        .toList()
-                    : planets;
-
-                if (visiblePlanets.isEmpty) {
-                  return const Center(child: Text('Ничего не нашлось'));
-                }
-
-                return ListView.builder(
-                  itemCount: visiblePlanets.length,
-                  itemBuilder: (context, index) {
-                    final planet = visiblePlanets[index];
-                    return PlanetCard(
-                      planet: planet,
-                      isLiked:
-                          planet.id != null && _likedIds.contains(planet.id),
-                      onLikeTap: () {
-                        if (planet.id != null) _toggleLike(planet.id!);
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+                  ],
+                ),
+              ),
+              Expanded(
+                child: visiblePlanets.isEmpty
+                    ? const Center(child: Text('В избранном пока пусто'))
+                    : ListView.builder(
+                        itemCount: visiblePlanets.length,
+                        itemBuilder: (context, index) {
+                          final planet = visiblePlanets[index];
+                          final isLiked = planet.id != null && loadedState.likedIds.contains(planet.id);
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PlanetDetailsScreen(planet: planet, isLiked: isLiked),
+                                ),
+                              );
+                            },
+                            child: PlanetCard(
+                              planet: planet,
+                              isLiked: isLiked,
+                              onLikeTap: () {
+                                if (planet.id != null) {
+                                  context.read<PlanetBloc>().add(PlanetLikeToggled(planet.id!, isLiked));
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          _showAddPlanetSheet(context);
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _showAddPlanetSheet(BuildContext context) {
+    final nameController = TextEditingController();
+    final planetBloc = context.read<PlanetBloc>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+            left: 16, right: 16, top: 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Название планеты', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () {
+                  final newName = nameController.text.trim();
+                  if (newName.isNotEmpty) {
+                    final newPlanet = Planet(
+                      name: newName,
+                      subtitle: 'Добавлено пользователем',
+                      category: Category.planet,
+                      letter: newName[0].toUpperCase(),
+                      color: Colors.grey,
+                    );
+                    planetBloc.add(PlanetAddRequested(newPlanet));
+                    Navigator.pop(bottomSheetContext);
+                  }
+                },
+                child: const Text('Добавить'),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
     );
   }
 }

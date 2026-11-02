@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/domain/entities/planet.dart';
 
 class PlanetCard extends StatelessWidget {
+  final Planet planet;
+  final bool isLiked;
+  final VoidCallback onLikeTap;
+
   const PlanetCard({
     super.key,
     required this.planet,
     required this.isLiked,
     required this.onLikeTap,
   });
-
-  final Planet planet;
-  final bool isLiked;
-  final VoidCallback onLikeTap;
 
   @override
   Widget build(BuildContext context) {
@@ -25,51 +25,26 @@ class PlanetCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Stack(
-            children: [
-              Container(
-                width: 88,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: planet.color,
-                  borderRadius: BorderRadius.circular(10),
-                ),
+          Hero(
+            tag: 'planet_cover_${planet.id}',
+            child: Container(
+              width: 88,
+              height: 120,
+              decoration: BoxDecoration(
+                color: planet.color,
+                borderRadius: BorderRadius.circular(10),
               ),
-              SizedBox(
-                width: 88,
-                height: 120,
-                child: Center(
-                  child: Text(
-                    planet.letter,
-                    style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+              child: Center(
+                child: Text(
+                  planet.letter,
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ),
-              Positioned(
-                top: 6,
-                right: 6,
-                child: InkWell(
-                  onTap: onLikeTap,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : Colors.grey,
-                      size: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -110,6 +85,18 @@ class PlanetCard extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+          GestureDetector(
+            onTap: onLikeTap,
+            child: AnimatedScale(
+              scale: isLiked ? 1.2 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                isLiked ? Icons.favorite : Icons.favorite_border,
+                color: isLiked ? Colors.red : Colors.grey,
+                size: 28,
+              ),
             ),
           ),
         ],

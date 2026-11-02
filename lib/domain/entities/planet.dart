@@ -19,23 +19,8 @@ class Planet {
     required this.category,
     required this.letter,
     required this.color,
-    this.description, 
+    this.description,
   });
-
-  factory Planet.fromJson(Map<String, dynamic> json) {
-    return Planet(
-      id: json['id']?.toString(),
-      name: json['name'] ?? 'Без названия',
-      subtitle: json['subtitle'] ?? '',
-      category: Category.values.firstWhere(
-        (e) => e.name == json['category'],
-        orElse: () => Category.planet,
-      ),
-      letter: json['letter'] ?? '?',
-      color: Color(int.parse('FF${json['color'] ?? '000000'}', radix: 16)),
-      description: json['description'], 
-    );
-  }
 
   factory Planet.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
@@ -59,11 +44,8 @@ class Planet {
       'subtitle': subtitle,
       'category': category.name,
       'letter': letter,
-      'color': color.toARGB32().toRadixString(16).substring(2).toUpperCase(), 
+      'color': color.toARGB32().toRadixString(16).substring(2).toUpperCase(),
       'description': description ?? '',
     };
   }
-
-  @override
-  String toString() => 'Planet($id, $name)';
 }
